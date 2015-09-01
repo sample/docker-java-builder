@@ -3,4 +3,4 @@ Create java directory and copy jre-8u<version>-linux-x64.tar or jdk-8u<version>-
 
 `docker run -v $PWD/java:/java -v $PWD/target:/target -it --rm sample/java-builder jre-8u60-linux-x64.tar`
 
-Obtain /oracle-jre8_<version>_amd64.deb package from ./target directory.
+Obtain ./oracle-jre8_<version>_amd64.deb package from ./target directory.
