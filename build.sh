@@ -16,25 +16,69 @@ cd /target
 
 cat <<EOF > alternatives.sh
 #!/bin/bash
-/usr/bin/update-alternatives --install /usr/bin/java java /opt/$SDK_VERSION/bin/java 1
+LATEST=1
+LATEST=$((`LANG=C update-alternatives --display java | grep ^/ | sed -e 's/.* //g' | sort -n | tail -1`+1))
 EOF
 
 cat <<EOF > uninstall.sh
 #!/bin/bash
-/usr/bin/update-alternatives --remove java /opt/$SDK_VERSION/bin/java
 rm -rf /opt/$SDK_VERSION
 EOF
 
-JRE_PROVIDES='java-runtime java2-runtime java5-runtime java6-runtime java7-runtime java8-runtime'
-JDK_PROVIDES='java-compiler java-sdk java2-sdk java5-sdk java6-sdk java7-jdk java8-jdk'
+for f in /build/$JAVA_DIRECTORY/bin/*; do
+        name=`basename $f`;
+        if [ ! -f "/usr/bin/$name" -o -L "/usr/bin/$name" ]; then
+                # Some files, like jvisualvm might not be links
+                if [ -f "/build/$JAVA_DIRECTORY/man/man1/$name.1" ]; then
+                        echo $name
+                        echo update-alternatives --install /usr/bin/$name $name /opt/$JAVA_DIRECTORY/bin/$name \$LATEST \
+                                --slave /usr/share/man/man1/$name.1 $name.1 /opt/$JAVA_DIRECTORY/man/man1/$name.1 >> alternatives.sh
+                        #echo "jdk $name /opt/$JAVA_DIRECTORY/bin/$name" >> /usr/lib/jvm/.java-8-oracle.jinfo
+                fi
+        fi
+done
+
+
+for f in /build/$JAVA_DIRECTORY/man/man1/*; do
+        name=`basename $f .1`;
+        # Some files, like jvisualvm might not be links.
+        # Further assume this for corresponding man page
+        if [ ! -f "/usr/bin/$name" -o -L "/usr/bin/$name" ]; then
+                echo $name
+                echo update-alternatives --remove $name /opt/$JAVA_DIRECTORY/bin/$name >> uninstall.sh
+        fi
+done
+
+JRE_PROVIDES='java-virtual-machine java-compiler default-jre default-jre-headless
+          java-runtime java2-runtime java5-runtime java6-runtime java8-runtime
+          java-runtime-headless java2-runtime-headless java5-runtime-headless java6-runtime-headless java8-runtime-headless
+          openjdk-6-jre openjdk-6-jre-headless
+          openjdk-7-jre openjdk-7-jre-headless
+          openjdk-8-jre openjdk-8-jre-headless
+          sun-java6-bin sun-java6-jre sun-java6-fonts sun-java6-plugin
+          oracle-java7-bin oracle-java7-jre oracle-java7-fonts oracle-java7-plugin
+          oracle-java8-bin oracle-java8-jre oracle-java8-fonts oracle-java8-plugin'
+
+JDK_PROVIDES='java-virtual-machine java-compiler default-jre default-jdk default-jdk-headless
+          java-runtime java2-runtime java5-runtime java6-runtime java8-runtime
+          java-runtime-headless java2-runtime-headless java5-runtime-headless java6-runtime-headless java8-runtime-headless
+          java-jdk java2-jdk java5-jdk java6-jdk java8-jdk
+          java-sdk java2-sdk java5-sdk java6-sdk java8-sdk
+          openjdk-6-jre openjdk-6-jre-headless openjdk-6-jdk openjdk-6-jdk-headless openjdk-6-jdk
+          openjdk-7-jre openjdk-7-jre-headless openjdk-6-jdk openjdk-6-jdk-headless openjdk-6-jdk
+          openjdk-8-jre openjdk-8-jre-headless openjdk-8-jdk openjdk-8-jdk-headless openjdk-8-jdk
+          sun-java6-bin sun-java6-jdk sun-java6-jdk sun-java6-fonts sun-java6-plugin
+          oracle-java8-bin oracle-java8-fonts oracle-java8-plugin'
 
 PROVIDES=""
 if [ $JAVA_VARIANT == 'jdk' ]; then
   for i in `echo $JDK_PROVIDES`; do PROVIDES+="--provides $i "; done
+  PKG_NAME=oracle-java8-jdk
 else
   for i in `echo $JRE_PROVIDES`; do PROVIDES+="--provides $i "; done
+  PKG_NAME=oracle-java8
 fi
 
-fpm -f --verbose -s dir -t deb --after-install ./alternatives.sh --after-remove ./uninstall.sh --name oracle-$JAVA_VARIANT$JAVA_MAJOR_VERSION $PROVIDES -v $JAVA_VERSION --prefix=/opt/ -C /build $SDK_VERSION
+fpm -f --verbose -s dir -t deb --after-install ./alternatives.sh --after-remove ./uninstall.sh --name "$PKG_NAME" $PROVIDES -v $JAVA_VERSION --prefix=/opt/ -C /build/ $SDK_VERSION
 
 rm -f alternatives.sh uninstall.sh
